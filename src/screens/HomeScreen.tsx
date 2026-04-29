@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { AIDifficulty } from '@/types/game';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -22,13 +24,40 @@ export function HomeScreen(): React.ReactElement {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const theme = useGameStore((s) => s.theme);
   const toggleTheme = useGameStore((s) => s.toggleTheme);
+  const setAIDifficulty = useGameStore((s) => s.setAIDifficulty);
   const colors = getColors(theme);
 
-  const modes: { label: string; mode: 'local' | 'ai' | 'zen' | 'online'; disabled?: boolean; isLobby?: boolean }[] = [
+  const [showDifficultyModal, setShowDifficultyModal] = useState(false);
+
+  const handleSelectDifficulty = (difficulty: AIDifficulty) => {
+    setAIDifficulty(difficulty);
+    setShowDifficultyModal(false);
+    navigation.navigate('Game', { mode: 'ai' });
+  };
+
+  const handleModePress = (mode: 'local' | 'ai' | 'zen' | 'online', isLobby?: boolean) => {
+    if (mode === 'ai') {
+      setShowDifficultyModal(true);
+      return;
+    }
+    if (isLobby) {
+      navigation.navigate('Lobby');
+    } else {
+      navigation.navigate('Game', { mode });
+    }
+  };
+
+  const modes: { label: string; mode: 'local' | 'ai' | 'zen' | 'online'; isLobby?: boolean }[] = [
     { label: '2 Jugadores (Local)', mode: 'local' },
     { label: 'Vs IA', mode: 'ai' },
     { label: 'Online', mode: 'online', isLobby: true },
     { label: 'Modo Zen', mode: 'zen' },
+  ];
+
+  const difficulties: { label: string; value: AIDifficulty; color: string }[] = [
+    { label: 'Fácil', value: 'easy', color: '#4CD964' },
+    { label: 'Medio', value: 'medium', color: '#FF9500' },
+    { label: 'Difícil', value: 'hard', color: '#FF3B30' },
   ];
 
   return (
@@ -67,41 +96,27 @@ export function HomeScreen(): React.ReactElement {
 
       {/* Mode buttons */}
       <View style={styles.buttonsContainer}>
-        {modes.map(({ label, mode, disabled, isLobby }) => (
+        {modes.map(({ label, mode, isLobby }) => (
           <TouchableOpacity
             key={mode + label}
-            onPress={() => {
-              if (!disabled) {
-                if (isLobby) {
-                  navigation.navigate('Lobby');
-                } else {
-                  navigation.navigate('Game', { mode });
-                }
-              }
-            }}
-            disabled={disabled}
-            activeOpacity={disabled ? 1 : 0.7}
+            onPress={() => handleModePress(mode, isLobby)}
+            activeOpacity={0.7}
             style={[
               styles.modeButton,
               {
-                backgroundColor: disabled
-                  ? colors.disabled
-                  : colors.surface,
+                backgroundColor: colors.surface,
                 borderColor: colors.border,
               },
-              !disabled && styles.modeButtonActive,
+              styles.modeButtonActive,
             ]}
           >
             <Text
               style={[
                 styles.modeButtonText,
-                {
-                  color: disabled ? colors.textSecondary : colors.text,
-                },
+                { color: colors.text },
               ]}
             >
               {label}
-              {disabled && ' (Próximamente)'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -113,6 +128,39 @@ export function HomeScreen(): React.ReactElement {
           Sin empates. Sin límites.
         </Text>
       </View>
+
+      {/* Difficulty Modal */}
+      <Modal
+        visible={showDifficultyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDifficultyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Selecciona dificultad
+            </Text>
+            <View style={styles.difficultyButtons}>
+              {difficulties.map(({ label, value, color }) => (
+                <TouchableOpacity
+                  key={value}
+                  onPress={() => handleSelectDifficulty(value)}
+                  style={[styles.diffButton, { backgroundColor: color }]}
+                >
+                  <Text style={styles.diffButtonText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowDifficultyModal(false)}
+              style={styles.cancelButton}
+            >
+              <Text style={{ color: colors.textSecondary }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -181,5 +229,42 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  difficultyButtons: {
+    width: '100%',
+    gap: 12,
+  },
+  diffButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  diffButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    marginTop: 16,
+    paddingVertical: 10,
   },
 });

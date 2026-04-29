@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GameState, GameMode, UserProfile } from '@/types/game';
+import { GameState, GameMode, UserProfile, AIDifficulty } from '@/types/game';
 import {
   createInitialState,
   makeMove as engineMakeMove,
@@ -23,6 +23,7 @@ interface GameStoreState {
   theme: 'light' | 'dark';
   adsRemoved: boolean;
   interstitialCounter: number;
+  aiDifficulty: AIDifficulty;
 
   // Actions
   initAuth: () => Promise<void>;
@@ -35,6 +36,7 @@ interface GameStoreState {
   setAdsRemoved: (removed: boolean) => void;
   incrementInterstitialCounter: () => void;
   resetInterstitialCounter: () => void;
+  setAIDifficulty: (difficulty: AIDifficulty) => void;
 }
 
 export const useGameStore = create<GameStoreState>()(
@@ -48,6 +50,7 @@ export const useGameStore = create<GameStoreState>()(
       theme: 'dark',
       adsRemoved: false,
       interstitialCounter: 0,
+      aiDifficulty: 'medium',
 
       initAuth: async () => {
         try {
@@ -100,6 +103,8 @@ export const useGameStore = create<GameStoreState>()(
 
       resetInterstitialCounter: () =>
         set({ interstitialCounter: 0 }),
+      setAIDifficulty: (difficulty: AIDifficulty) =>
+        set({ aiDifficulty: difficulty }),
     }),
     {
       name: 'infinite-ttt-settings',
@@ -110,6 +115,7 @@ export const useGameStore = create<GameStoreState>()(
         theme: state.theme,
         adsRemoved: state.adsRemoved,
         interstitialCounter: state.interstitialCounter,
+        aiDifficulty: state.aiDifficulty,
       }),
     }
   )

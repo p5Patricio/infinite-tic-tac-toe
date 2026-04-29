@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import { getColors } from '@/constants/theme';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { updateGameState } from '@/services/firebase/roomService';
+import { getAIMove } from '@/services/game/AIEngine';
 
 type GameScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -34,10 +36,15 @@ export function GameScreen(): React.ReactElement {
   const makeMoveLocal = useGameStore((s) => s.makeMove);
   const resetGame = useGameStore((s) => s.resetGame);
   const theme = useGameStore((s) => s.theme);
+  const aiDifficulty = useGameStore((s) => s.aiDifficulty);
   const colors = getColors(theme);
 
   const isOnline = mode === 'online';
+  const isAI = mode === 'ai';
   const myPlayer = player ?? 'X';
+
+  const [aiThinking, setAiThinking] = useState(false);
+  const dotAnim = useRef(new Animated.Value(0)).current;
 
   const { isConnected, opponentDisconnected } = useOnlineGame(
     isOnline ? roomId : undefined,
@@ -47,6 +54,41 @@ export function GameScreen(): React.ReactElement {
   useEffect(() => {
     resetGame(mode);
   }, [mode]);
+
+  // Animación de puntos para "IA pensando"
+  useEffect(() => {
+    if (!aiThinking) {
+      dotAnim.setValue(0);
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(dotAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [aiThinking]);
+
+  // Turno de la IA
+  useEffect(() => {
+    if (!isAI || gameState.isGameOver) return;
+    if (gameState.currentPlayer !== 'O') return;
+
+    setAiThinking(true);
+    const delay = 400 + Math.random() * 400; // 400-800ms
+
+    const timeout = setTimeout(() => {
+      const move = getAIMove(gameState, aiDifficulty);
+      setAiThinking(false);
+      if (move >= 0 && move <= 8) {
+        makeMoveLocal(move);
+      }
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [gameState.currentPlayer, gameState.isGameOver, isAI, aiDifficulty, gameState.totalMoves]);
 
   // Alerta de desconexión del oponente
   useEffect(() => {
@@ -65,13 +107,10 @@ export function GameScreen(): React.ReactElement {
   const handleCellPress = useCallback(
     (position: number) => {
       if (gameState.isGameOver) return;
+      if (aiThinking) return;
 
       if (isOnline) {
-        // Validar que sea nuestro turno
-        if (gameState.currentPlayer !== myPlayer) {
-          return;
-        }
-        // Hacer movimiento local y sincronizar
+        if (gameState.currentPlayer !== myPlayer) return;
         makeMoveLocal(position);
         if (roomId) {
           const newState = useGameStore.getState().gameState;
@@ -79,11 +118,15 @@ export function GameScreen(): React.ReactElement {
             console.error('Failed to sync move:', err);
           });
         }
+      } else if (isAI) {
+        // Solo el humano (X) puede jugar, y solo cuando no está pensando la IA
+        if (gameState.currentPlayer !== 'X') return;
+        makeMoveLocal(position);
       } else {
         makeMoveLocal(position);
       }
     },
-    [gameState.isGameOver, gameState.currentPlayer, isOnline, myPlayer, roomId, makeMoveLocal]
+    [gameState.isGameOver, gameState.currentPlayer, isOnline, isAI, myPlayer, roomId, makeMoveLocal, aiThinking]
   );
 
   const modeLabel =
@@ -101,6 +144,12 @@ export function GameScreen(): React.ReactElement {
       : isConnected
       ? 'Conectado'
       : 'Conectando...'
+    : isAI
+    ? aiDifficulty === 'easy'
+      ? 'Fácil'
+      : aiDifficulty === 'medium'
+      ? 'Medio'
+      : 'Difícil'
     : null;
 
   return (
@@ -164,6 +213,20 @@ export function GameScreen(): React.ReactElement {
         )}
       </View>
 
+      {/* IA pensando */}
+      {isAI && aiThinking && (
+        <View style={styles.thinkingContainer}>
+          <Animated.Text
+            style={[
+              styles.thinkingText,
+              { color: colors.textSecondary, opacity: dotAnim },
+            ]}
+          >
+            🤖 IA está pensando...
+          </Animated.Text>
+        </View>
+      )}
+
       {/* Board */}
       <View style={styles.boardContainer}>
         <Board onCellPress={handleCellPress} />
@@ -218,7 +281,7 @@ const styles = StyleSheet.create({
   turnContainer: {
     alignItems: 'center',
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   turnText: {
     fontSize: 18,
@@ -230,6 +293,14 @@ const styles = StyleSheet.create({
   myPlayerText: {
     fontSize: 14,
     marginTop: 4,
+  },
+  thinkingContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  thinkingText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   boardContainer: {
     flex: 1,
