@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -15,6 +16,8 @@ import { WinOverlay } from '@/components/game/WinOverlay';
 import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { useOnlineGame } from '@/hooks/useOnlineGame';
+import { updateGameState } from '@/services/firebase/roomService';
 
 type GameScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -25,16 +28,63 @@ type GameScreenRouteProp = RouteProp<RootStackParamList, 'Game'>;
 export function GameScreen(): React.ReactElement {
   const navigation = useNavigation<GameScreenNavigationProp>();
   const route = useRoute<GameScreenRouteProp>();
-  const { mode } = route.params ?? { mode: 'local' };
+  const { mode, roomId, player } = route.params ?? { mode: 'local' };
 
   const gameState = useGameStore((s) => s.gameState);
+  const makeMoveLocal = useGameStore((s) => s.makeMove);
   const resetGame = useGameStore((s) => s.resetGame);
   const theme = useGameStore((s) => s.theme);
   const colors = getColors(theme);
 
+  const isOnline = mode === 'online';
+  const myPlayer = player ?? 'X';
+
+  const { isConnected, opponentDisconnected } = useOnlineGame(
+    isOnline ? roomId : undefined,
+    isOnline ? myPlayer : undefined
+  );
+
   useEffect(() => {
     resetGame(mode);
   }, [mode]);
+
+  // Alerta de desconexión del oponente
+  useEffect(() => {
+    if (opponentDisconnected && isOnline) {
+      Alert.alert(
+        'Oponente desconectado',
+        'Tu oponente se ha desconectado.',
+        [
+          { text: 'Menú', onPress: () => navigation.navigate('Home') },
+          { text: 'Esperar', style: 'cancel' },
+        ]
+      );
+    }
+  }, [opponentDisconnected, isOnline, navigation]);
+
+  const handleCellPress = useCallback(
+    (position: number) => {
+      if (gameState.isGameOver) return;
+
+      if (isOnline) {
+        // Validar que sea nuestro turno
+        if (gameState.currentPlayer !== myPlayer) {
+          return;
+        }
+        // Hacer movimiento local y sincronizar
+        makeMoveLocal(position);
+        if (roomId) {
+          const newState = useGameStore.getState().gameState;
+          updateGameState(roomId, newState).catch((err) => {
+            console.error('Failed to sync move:', err);
+          });
+        }
+      } else {
+        makeMoveLocal(position);
+      }
+    },
+    [gameState.isGameOver, gameState.currentPlayer, isOnline, myPlayer, roomId, makeMoveLocal]
+  );
 
   const modeLabel =
     mode === 'local'
@@ -44,6 +94,14 @@ export function GameScreen(): React.ReactElement {
       : mode === 'zen'
       ? 'Modo Zen'
       : 'Online';
+
+  const statusText = isOnline
+    ? opponentDisconnected
+      ? 'Oponente desconectado'
+      : isConnected
+      ? 'Conectado'
+      : 'Conectando...'
+    : null;
 
   return (
     <SafeAreaView
@@ -59,9 +117,25 @@ export function GameScreen(): React.ReactElement {
         >
           <Text style={[styles.backText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {modeLabel}
-        </Text>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {modeLabel}
+          </Text>
+          {statusText && (
+            <Text
+              style={[
+                styles.statusText,
+                {
+                  color: opponentDisconnected
+                    ? colors.playerX
+                    : colors.textSecondary,
+                },
+              ]}
+            >
+              {statusText}
+            </Text>
+          )}
+        </View>
         <View style={styles.backButton} />
       </View>
 
@@ -83,11 +157,16 @@ export function GameScreen(): React.ReactElement {
             {gameState.currentPlayer}
           </Text>
         </Text>
+        {isOnline && (
+          <Text style={[styles.myPlayerText, { color: colors.textSecondary }]}>
+            Tú eres {myPlayer}
+          </Text>
+        )}
       </View>
 
       {/* Board */}
       <View style={styles.boardContainer}>
-        <Board />
+        <Board onCellPress={handleCellPress} />
       </View>
 
       {/* Player indicator */}
@@ -125,9 +204,16 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 28,
   },
+  headerCenter: {
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  statusText: {
+    fontSize: 12,
+    marginTop: 2,
   },
   turnContainer: {
     alignItems: 'center',
@@ -140,6 +226,10 @@ const styles = StyleSheet.create({
   turnPlayer: {
     fontWeight: 'bold',
     fontSize: 22,
+  },
+  myPlayerText: {
+    fontSize: 14,
+    marginTop: 4,
   },
   boardContainer: {
     flex: 1,

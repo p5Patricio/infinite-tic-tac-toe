@@ -24,10 +24,10 @@ export function HomeScreen(): React.ReactElement {
   const toggleTheme = useGameStore((s) => s.toggleTheme);
   const colors = getColors(theme);
 
-  const modes: { label: string; mode: 'local' | 'ai' | 'zen'; disabled?: boolean }[] = [
+  const modes: { label: string; mode: 'local' | 'ai' | 'zen' | 'online'; disabled?: boolean; isLobby?: boolean }[] = [
     { label: '2 Jugadores (Local)', mode: 'local' },
     { label: 'Vs IA', mode: 'ai' },
-    { label: 'Online', mode: 'zen', disabled: true },
+    { label: 'Online', mode: 'online', isLobby: true },
     { label: 'Modo Zen', mode: 'zen' },
   ];
 
@@ -67,11 +67,17 @@ export function HomeScreen(): React.ReactElement {
 
       {/* Mode buttons */}
       <View style={styles.buttonsContainer}>
-        {modes.map(({ label, mode, disabled }) => (
+        {modes.map(({ label, mode, disabled, isLobby }) => (
           <TouchableOpacity
             key={mode + label}
             onPress={() => {
-              if (!disabled) navigation.navigate('Game', { mode });
+              if (!disabled) {
+                if (isLobby) {
+                  navigation.navigate('Lobby');
+                } else {
+                  navigation.navigate('Game', { mode });
+                }
+              }
             }}
             disabled={disabled}
             activeOpacity={disabled ? 1 : 0.7}

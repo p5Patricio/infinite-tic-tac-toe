@@ -4,7 +4,11 @@ import { Cell } from './Cell';
 import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
 
-export function Board(): React.ReactElement {
+interface BoardProps {
+  onCellPress?: (index: number) => void;
+}
+
+export function Board({ onCellPress }: BoardProps): React.ReactElement {
   const gameState = useGameStore((s) => s.gameState);
   const makeMove = useGameStore((s) => s.makeMove);
   const theme = useGameStore((s) => s.theme);
@@ -27,6 +31,14 @@ export function Board(): React.ReactElement {
     return new Set(gameState.winningLine);
   }, [gameState.winningLine]);
 
+  const handlePress = (index: number) => {
+    if (onCellPress) {
+      onCellPress(index);
+    } else {
+      makeMove(index);
+    }
+  };
+
   return (
     <View style={[styles.board, { backgroundColor: colors.surface }]}
     >
@@ -35,7 +47,7 @@ export function Board(): React.ReactElement {
           <Cell
             key={index}
             value={value}
-            onPress={() => makeMove(index)}
+            onPress={() => handlePress(index)}
             isWinningCell={winningSet.has(index)}
             isGhost={ghostPosition === index && value === null}
             disabled={gameState.isGameOver}
