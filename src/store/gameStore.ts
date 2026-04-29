@@ -1,13 +1,19 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GameState, GameMode } from '@/types/game';
+import { GameState, GameMode, UserProfile } from '@/types/game';
 import {
   createInitialState,
   makeMove as engineMakeMove,
 } from '@/services/game/GameEngine';
+import { signInAnonymously } from '@/services/firebase/auth';
+import { createUserProfile } from '@/services/firebase/userService';
 
 interface GameStoreState {
+  // Auth
+  user: UserProfile | null;
+  isAuthenticated: boolean;
+
   // Game state
   gameState: GameState;
 
@@ -19,6 +25,7 @@ interface GameStoreState {
   interstitialCounter: number;
 
   // Actions
+  initAuth: () => Promise<void>;
   makeMove: (position: number) => void;
   resetGame: (mode?: GameMode) => void;
   setGameMode: (mode: GameMode) => void;
@@ -33,12 +40,24 @@ interface GameStoreState {
 export const useGameStore = create<GameStoreState>()(
   persist(
     (set, get) => ({
+      user: null,
+      isAuthenticated: false,
       gameState: createInitialState(),
       soundEnabled: true,
       hapticEnabled: true,
       theme: 'dark',
       adsRemoved: false,
       interstitialCounter: 0,
+
+      initAuth: async () => {
+        try {
+          const profile = await signInAnonymously();
+          await createUserProfile(profile.uid);
+          set({ user: profile, isAuthenticated: true });
+        } catch (error) {
+          console.error('Auth initialization failed:', error);
+        }
+      },
 
       makeMove: (position: number) => {
         const { gameState } = get();
