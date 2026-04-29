@@ -20,6 +20,13 @@ import { RootStackParamList } from '@/navigation/AppNavigator';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { updateGameState } from '@/services/firebase/roomService';
 import { getAIMove } from '@/services/game/AIEngine';
+import { AdBanner } from '@/components/game/AdBanner';
+import {
+  incrementGameCounter,
+  shouldShowInterstitial,
+  showInterstitial,
+  resetGameCounter,
+} from '@/services/ads/AdManager';
 
 type GameScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -235,13 +242,27 @@ export function GameScreen(): React.ReactElement {
       {/* Player indicator */}
       <PlayerIndicator />
 
-      {/* Banner placeholder */}
-      <View style={styles.bannerPlaceholder} />
+      {/* Banner Ad */}
+      <AdBanner visible={mode !== 'zen'} />
 
       {/* Win overlay */}
       <WinOverlay
-        onPlayAgain={() => resetGame(mode)}
-        onMenu={() => navigation.navigate('Home')}
+        onPlayAgain={async () => {
+          incrementGameCounter();
+          if (shouldShowInterstitial()) {
+            await showInterstitial();
+            resetGameCounter();
+          }
+          resetGame(mode);
+        }}
+        onMenu={async () => {
+          incrementGameCounter();
+          if (shouldShowInterstitial()) {
+            await showInterstitial();
+            resetGameCounter();
+          }
+          navigation.navigate('Home');
+        }}
       />
     </SafeAreaView>
   );

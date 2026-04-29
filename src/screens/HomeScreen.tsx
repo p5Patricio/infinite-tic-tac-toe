@@ -77,7 +77,7 @@ export function HomeScreen(): React.ReactElement {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => {}}
+          onPress={() => navigation.navigate('Settings')}
           style={[styles.iconButton, { borderColor: colors.border }]}
         >
           <Text style={{ color: colors.text }}>⚙️</Text>
