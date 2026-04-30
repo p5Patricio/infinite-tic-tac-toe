@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Modal,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -35,22 +36,28 @@ export function HomeScreen(): React.ReactElement {
     navigation.navigate('Game', { mode: 'ai' });
   };
 
+  const isOnlineAvailable = useGameStore((s) => s.isOnlineAvailable);
+
   const handleModePress = (mode: 'local' | 'ai' | 'zen' | 'online', isLobby?: boolean) => {
     if (mode === 'ai') {
       setShowDifficultyModal(true);
       return;
     }
     if (isLobby) {
+      if (!isOnlineAvailable) {
+        Alert.alert('Multijugador no disponible', 'El modo online requiere configuración de Firebase.');
+        return;
+      }
       navigation.navigate('Lobby');
     } else {
       navigation.navigate('Game', { mode });
     }
   };
 
-  const modes: { label: string; mode: 'local' | 'ai' | 'zen' | 'online'; isLobby?: boolean }[] = [
+  const modes: { label: string; mode: 'local' | 'ai' | 'zen' | 'online'; isLobby?: boolean; disabled?: boolean }[] = [
     { label: '2 Jugadores (Local)', mode: 'local' },
     { label: 'Vs IA', mode: 'ai' },
-    { label: 'Online', mode: 'online', isLobby: true },
+    { label: 'Online', mode: 'online', isLobby: true, disabled: !isOnlineAvailable },
     { label: 'Modo Zen', mode: 'zen' },
   ];
 
@@ -96,27 +103,30 @@ export function HomeScreen(): React.ReactElement {
 
       {/* Mode buttons */}
       <View style={styles.buttonsContainer}>
-        {modes.map(({ label, mode, isLobby }) => (
+        {modes.map(({ label, mode, isLobby, disabled }) => (
           <TouchableOpacity
             key={mode + label}
             onPress={() => handleModePress(mode, isLobby)}
-            activeOpacity={0.7}
+            disabled={disabled}
+            activeOpacity={disabled ? 1 : 0.7}
             style={[
               styles.modeButton,
               {
-                backgroundColor: colors.surface,
+                backgroundColor: disabled ? colors.disabled : colors.surface,
                 borderColor: colors.border,
+                opacity: disabled ? 0.5 : 1,
               },
-              styles.modeButtonActive,
+              !disabled && styles.modeButtonActive,
             ]}
           >
             <Text
               style={[
                 styles.modeButtonText,
-                { color: colors.text },
+                { color: disabled ? colors.textSecondary : colors.text },
               ]}
             >
               {label}
+              {disabled && ' (Offline)'}
             </Text>
           </TouchableOpacity>
         ))}

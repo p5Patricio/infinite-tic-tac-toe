@@ -13,11 +13,21 @@ import {
   Unsubscribe,
   runTransaction,
 } from 'firebase/firestore';
-import { db } from './config';
+import { db, isFirebaseReady } from './config';
 import { GameState, OnlineRoom } from '@/types/game';
 import { createInitialState } from '@/services/game/GameEngine';
 
 const ROOMS_COLLECTION = 'rooms';
+
+const OFFLINE_ERROR = new Error(
+  'Modo online no disponible. Configure Firebase para habilitar multijugador.'
+);
+
+function assertOnline(): void {
+  if (!isFirebaseReady || !db) {
+    throw OFFLINE_ERROR;
+  }
+}
 
 function toOnlineRoom(docId: string, data: unknown): OnlineRoom {
   const d = data as Record<string, unknown>;
@@ -33,7 +43,8 @@ function toOnlineRoom(docId: string, data: unknown): OnlineRoom {
 }
 
 export async function createRoom(userId: string): Promise<string> {
-  const roomRef = doc(collection(db, ROOMS_COLLECTION));
+  assertOnline();
+  const roomRef = doc(collection(db!, ROOMS_COLLECTION));
   const initialState = createInitialState({ gameMode: 'online' });
 
   await setDoc(roomRef, {
@@ -54,7 +65,8 @@ export async function joinRoom(
   roomId: string,
   userId: string
 ): Promise<void> {
-  const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+  assertOnline();
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
   const snapshot = await getDoc(roomRef);
 
   if (!snapshot.exists()) {
@@ -81,7 +93,8 @@ export function listenToRoom(
   roomId: string,
   callback: (room: OnlineRoom) => void
 ): Unsubscribe {
-  const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+  assertOnline();
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
   return onSnapshot(roomRef, (snapshot) => {
     if (!snapshot.exists()) return;
     const room = toOnlineRoom(snapshot.id, snapshot.data());
@@ -93,7 +106,8 @@ export async function updateGameState(
   roomId: string,
   gameState: GameState
 ): Promise<void> {
-  const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+  assertOnline();
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
   await updateDoc(roomRef, {
     gameState,
     lastMoveAt: serverTimestamp(),
@@ -103,7 +117,8 @@ export async function updateGameState(
 export async function findOrCreateMatchmakingRoom(
   userId: string
 ): Promise<string> {
-  const roomsRef = collection(db, ROOMS_COLLECTION);
+  assertOnline();
+  const roomsRef = collection(db!, ROOMS_COLLECTION);
   const q = query(
     roomsRef,
     where('status', '==', 'waiting'),
@@ -113,11 +128,10 @@ export async function findOrCreateMatchmakingRoom(
   const snapshot = await getDocs(q);
 
   if (!snapshot.empty) {
-    // Usar transaccion para evitar race conditions
     for (const docSnap of snapshot.docs) {
       const roomRef = docSnap.ref;
       try {
-        await runTransaction(db, async (transaction) => {
+        await runTransaction(db!, async (transaction) => {
           const roomDoc = await transaction.get(roomRef);
           if (!roomDoc.exists()) throw new Error('Room no longer exists');
           const data = roomDoc.data();
@@ -133,7 +147,6 @@ export async function findOrCreateMatchmakingRoom(
         });
         return roomRef.id;
       } catch {
-        // Intentar siguiente sala
         continue;
       }
     }
@@ -146,7 +159,8 @@ export async function sendHeartbeat(
   roomId: string,
   player: 'X' | 'O'
 ): Promise<void> {
-  const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+  assertOnline();
+  const roomRef = doc(db!, ROOMS_COLLECTION, roomId);
   const field = player === 'X' ? 'lastSeenAtX' : 'lastSeenAtO';
   await updateDoc(roomRef, {
     [field]: serverTimestamp(),

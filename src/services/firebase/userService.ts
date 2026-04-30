@@ -1,11 +1,18 @@
 import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { db } from './config';
+import { db, isFirebaseReady } from './config';
 import { UserProfile } from '@/types/game';
 
 const USERS_COLLECTION = 'users';
 
+function assertOnline(): void {
+  if (!isFirebaseReady || !db) {
+    throw new Error('Firebase offline');
+  }
+}
+
 export async function createUserProfile(uid: string): Promise<void> {
-  const userRef = doc(db, USERS_COLLECTION, uid);
+  assertOnline();
+  const userRef = doc(db!, USERS_COLLECTION, uid);
   const snapshot = await getDoc(userRef);
 
   if (snapshot.exists()) return;
@@ -23,7 +30,8 @@ export async function createUserProfile(uid: string): Promise<void> {
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const userRef = doc(db, USERS_COLLECTION, uid);
+  assertOnline();
+  const userRef = doc(db!, USERS_COLLECTION, uid);
   const snapshot = await getDoc(userRef);
 
   if (!snapshot.exists()) return null;
@@ -38,7 +46,8 @@ export async function updateStats(
   uid: string,
   won: boolean
 ): Promise<void> {
-  const userRef = doc(db, USERS_COLLECTION, uid);
+  assertOnline();
+  const userRef = doc(db!, USERS_COLLECTION, uid);
   const updates: Record<string, unknown> = {
     gamesPlayed: increment(1),
   };

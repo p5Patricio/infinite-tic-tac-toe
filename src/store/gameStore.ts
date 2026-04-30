@@ -8,11 +8,13 @@ import {
 } from '@/services/game/GameEngine';
 import { signInAnonymously } from '@/services/firebase/auth';
 import { createUserProfile } from '@/services/firebase/userService';
+import { isFirebaseReady } from '@/services/firebase/config';
 
 interface GameStoreState {
   // Auth
   user: UserProfile | null;
   isAuthenticated: boolean;
+  isOnlineAvailable: boolean;
 
   // Game state
   gameState: GameState;
@@ -44,6 +46,7 @@ export const useGameStore = create<GameStoreState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
+      isOnlineAvailable: isFirebaseReady,
       gameState: createInitialState(),
       soundEnabled: true,
       hapticEnabled: true,
@@ -55,7 +58,11 @@ export const useGameStore = create<GameStoreState>()(
       initAuth: async () => {
         try {
           const profile = await signInAnonymously();
-          await createUserProfile(profile.uid);
+          if (isFirebaseReady) {
+            await createUserProfile(profile.uid).catch(() => {
+              // Ignorar errores de creación de perfil
+            });
+          }
           set({ user: profile, isAuthenticated: true });
         } catch (error) {
           console.error('Auth initialization failed:', error);

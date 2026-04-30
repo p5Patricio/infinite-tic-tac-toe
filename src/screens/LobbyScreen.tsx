@@ -36,6 +36,7 @@ function generateShortCode(): string {
 export function LobbyScreen(): React.ReactElement {
   const navigation = useNavigation<LobbyNavProp>();
   const theme = useGameStore((s) => s.theme);
+  const isOnlineAvailable = useGameStore((s) => s.isOnlineAvailable);
   const colors = getColors(theme);
 
   const [status, setStatus] = useState<'idle' | 'searching' | 'found' | 'waiting_code'>('idle');
@@ -43,7 +44,7 @@ export function LobbyScreen(): React.ReactElement {
   const [joinInput, setJoinInput] = useState('');
   const [, setMyPlayer] = useState<'X' | 'O'>('X');
 
-  const userId = auth.currentUser?.uid;
+  const userId = auth?.currentUser?.uid ?? 'offline-user';
 
   const navigateToGame = useCallback(
     (roomId: string, player: 'X' | 'O') => {
@@ -66,6 +67,7 @@ export function LobbyScreen(): React.ReactElement {
       const roomId = await findOrCreateMatchmakingRoom(userId);
       const { getDoc, doc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase/config');
+      if (!db) throw new Error('Firebase no disponible');
       const snap = await getDoc(doc(db, 'rooms', roomId));
       if (!snap.exists()) throw new Error('Room not found');
       const data = snap.data();
@@ -73,10 +75,10 @@ export function LobbyScreen(): React.ReactElement {
       setMyPlayer(player);
       setStatus('found');
       navigateToGame(roomId, player);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setStatus('idle');
-      Alert.alert('Error', 'No se pudo encontrar partida');
+      Alert.alert('Error', err?.message ?? 'No se pudo encontrar partida');
     }
   }, [userId, navigateToGame]);
 
@@ -88,15 +90,14 @@ export function LobbyScreen(): React.ReactElement {
     setStatus('waiting_code');
     try {
       const roomId = await createRoom(userId);
-      // Generar short code y guardarlo
       const shortCode = generateShortCode();
       const { updateDoc, doc } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase/config');
+      if (!db) throw new Error('Firebase no disponible');
       await updateDoc(doc(db, 'rooms', roomId), { shortCode });
       setRoomCode(shortCode);
       setMyPlayer('X');
 
-      // Escuchar hasta que alguien se una
       const { onSnapshot } = await import('firebase/firestore');
       const unsub = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
         if (!snap.exists()) return;
@@ -106,10 +107,10 @@ export function LobbyScreen(): React.ReactElement {
           navigateToGame(roomId, 'X');
         }
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setStatus('idle');
-      Alert.alert('Error', 'No se pudo crear la sala');
+      Alert.alert('Error', err?.message ?? 'No se pudo crear la sala');
     }
   }, [userId, navigateToGame]);
 
@@ -124,9 +125,9 @@ export function LobbyScreen(): React.ReactElement {
     }
     setStatus('searching');
     try {
-      // Buscar sala por shortCode
       const { query, collection, where, getDocs } = await import('firebase/firestore');
       const { db } = await import('@/services/firebase/config');
+      if (!db) throw new Error('Firebase no disponible');
       const q = query(
         collection(db, 'rooms'),
         where('shortCode', '==', joinInput.trim().toUpperCase()),
@@ -143,10 +144,10 @@ export function LobbyScreen(): React.ReactElement {
       await joinRoom(roomId, userId);
       setMyPlayer('O');
       navigateToGame(roomId, 'O');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setStatus('idle');
-      Alert.alert('Error', 'No se pudo unir a la sala');
+      Alert.alert('Error', err?.message ?? 'No se pudo unir a la sala');
     }
   }, [userId, joinInput, navigateToGame]);
 
@@ -154,6 +155,39 @@ export function LobbyScreen(): React.ReactElement {
     setStatus('idle');
     setRoomCode('');
   }, []);
+
+  // Pantalla de offline
+  if (!isOnlineAvailable) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Text style={[styles.backText, { color: colors.text }]}>←</Text>
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Online</Text>
+          <View style={styles.backButton} />
+        </View>
+        <View style={styles.offlineContainer}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>📡</Text>
+          <Text style={[styles.offlineTitle, { color: colors.text }]}>
+            Multijugador no disponible
+          </Text>
+          <Text style={[styles.offlineText, { color: colors.textSecondary }]}>
+            Configure Firebase en la sección de desarrollo para habilitar partidas online.
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={[styles.backMenuButton, { backgroundColor: colors.buttonBg }]}
+          >
+            <Text style={[styles.backMenuText, { color: colors.buttonText }]}>
+              Volver al menú
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -287,6 +321,33 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  offlineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  offlineTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  offlineText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 20,
+  },
+  backMenuButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+  },
+  backMenuText: {
+    fontSize: 16,
     fontWeight: '600',
   },
   centered: {
