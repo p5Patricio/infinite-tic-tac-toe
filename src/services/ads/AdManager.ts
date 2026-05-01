@@ -1,16 +1,22 @@
 import { useGameStore } from '@/store/gameStore';
+import Constants from 'expo-constants';
 
-// ─── MOCK / DEV MODE ─────────────────────────────────────────────
-// En desarrollo (Expo Go), AdMob nativo no está disponible.
-// Estos mocks loguean a consola para facilitar testing sin crash.
-// En producción (EAS Build), se usa el SDK real.
-// ─── REEMPLAZAR CON IDS REALES ANTES DE PRODUCCION ──────────────
+// ─── CONFIGURACIÓN DE ADMOB ───────────────────────────────────────
+// En producción, reemplazar estos IDs de prueba por los IDs reales
+// de tu cuenta de AdMob en app.json → extra.
+// ──────────────────────────────────────────────────────────────────
 
 const IS_MOCK = __DEV__;
 
-// Placeholder IDs de prueba de Google (test ads)
-const BANNER_AD_UNIT_ID_ANDROID = 'ca-app-pub-3940256099942544/6300978111';
-const INTERSTITIAL_AD_UNIT_ID_ANDROID = 'ca-app-pub-3940256099942544/1033173712';
+const extra = Constants.expoConfig?.extra ?? {};
+
+const ANDROID_BANNER_ID =
+  (extra.admobAndroidBannerId as string) ||
+  'ca-app-pub-3940256099942544/6300978111';
+
+const ANDROID_INTERSTITIAL_ID =
+  (extra.admobAndroidInterstitialId as string) ||
+  'ca-app-pub-3940256099942544/1033173712';
 
 let interstitialLoaded = false;
 
@@ -28,9 +34,7 @@ try {
 }
 
 export function getBannerAdUnitId(): string {
-  // En prod, usar process.env.EXPO_PUBLIC_ADMOB_BANNER_AD_UNIT_ID_ANDROID / _IOS
-  // Por ahora, placeholders de test
-  return BANNER_AD_UNIT_ID_ANDROID;
+  return ANDROID_BANNER_ID;
 }
 
 export async function initializeAds(): Promise<void> {
@@ -56,7 +60,7 @@ export async function loadInterstitial(): Promise<void> {
   }
   if (!InterstitialAd) return;
 
-  const adUnitId = INTERSTITIAL_AD_UNIT_ID_ANDROID;
+  const adUnitId = ANDROID_INTERSTITIAL_ID;
   const interstitial = InterstitialAd.createForAdRequest(adUnitId);
 
   interstitial.load();
@@ -90,7 +94,7 @@ export async function showInterstitial(): Promise<boolean> {
   if (!InterstitialAd || !interstitialLoaded) return false;
 
   // Crear nuevo y mostrar (simplificado; en prod se reutiliza la instancia cargada)
-  const adUnitId = INTERSTITIAL_AD_UNIT_ID_ANDROID;
+  const adUnitId = ANDROID_INTERSTITIAL_ID;
   const interstitial = InterstitialAd.createForAdRequest(adUnitId);
 
   return new Promise((resolve) => {

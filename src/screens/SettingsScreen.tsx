@@ -15,6 +15,7 @@ import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { AnalyticsManager } from '@/services/analytics/AnalyticsManager';
 
 const pkg = require('../../package.json');
 
@@ -33,6 +34,21 @@ export function SettingsScreen(): React.ReactElement {
   const resetStatsAsync = useGameStore((s) => s.resetStatsAsync);
   const resolvedTheme = useTheme();
   const colors = getColors(resolvedTheme);
+
+  const handleToggleSound = (value: boolean) => {
+    toggleSound();
+    AnalyticsManager.logSettingsChanged('sound', value);
+  };
+
+  const handleToggleHaptic = (value: boolean) => {
+    toggleHaptic();
+    AnalyticsManager.logSettingsChanged('haptic', value);
+  };
+
+  const handleSetTheme = (value: 'light' | 'dark' | 'system') => {
+    setTheme(value);
+    AnalyticsManager.logSettingsChanged('theme', value);
+  };
 
   const handleResetStats = () => {
     Alert.alert(
@@ -82,7 +98,7 @@ export function SettingsScreen(): React.ReactElement {
             {themeOptions.map((opt) => (
               <TouchableOpacity
                 key={opt.value}
-                onPress={() => setTheme(opt.value)}
+                onPress={() => handleSetTheme(opt.value)}
                 style={[
                   styles.themeButton,
                   {
@@ -113,7 +129,7 @@ export function SettingsScreen(): React.ReactElement {
           <Text style={[styles.rowLabel, { color: colors.text }]}>🔊 Sonido</Text>
           <Switch
             value={soundEnabled}
-            onValueChange={toggleSound}
+            onValueChange={handleToggleSound}
             trackColor={{ false: colors.disabled, true: colors.primary }}
           />
         </View>
@@ -123,7 +139,7 @@ export function SettingsScreen(): React.ReactElement {
           <Text style={[styles.rowLabel, { color: colors.text }]}>📳 Vibración</Text>
           <Switch
             value={hapticEnabled}
-            onValueChange={toggleHaptic}
+            onValueChange={handleToggleHaptic}
             trackColor={{ false: colors.disabled, true: colors.primary }}
           />
         </View>

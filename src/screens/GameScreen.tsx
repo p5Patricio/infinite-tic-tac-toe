@@ -30,6 +30,7 @@ import {
 } from '@/services/ads/AdManager';
 import { AudioManager } from '@/services/audio/AudioManager';
 import { HapticsManager } from '@/services/haptics/HapticsManager';
+import { AnalyticsManager } from '@/services/analytics/AnalyticsManager';
 
 type GameScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -71,6 +72,7 @@ export function GameScreen(): React.ReactElement {
 
   useEffect(() => {
     resetGame(mode);
+    AnalyticsManager.logGameStarted(mode);
   }, [mode]);
 
   // Animación de puntos para "IA pensando"
@@ -130,6 +132,7 @@ export function GameScreen(): React.ReactElement {
       if (gameState.winner && gameState.winner !== 'draw') {
         AudioManager.playWin().catch(() => {});
         HapticsManager.hapticWin().catch(() => {});
+        AnalyticsManager.logGameWon(mode, gameState.winner, gameState.totalMoves);
 
         if (mode !== 'online' && mode !== 'zen') {
           if (gameState.winner === myPlayer) {

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
 import { shouldShowAds, getBannerAdUnitId } from '@/services/ads/AdManager';
+import { AnalyticsManager } from '@/services/analytics/AnalyticsManager';
 
 let BannerAd: React.ComponentType<any> | null = null;
 let BannerAdSize: Record<string, string> | null = null;
@@ -30,6 +31,7 @@ export function AdBanner({ visible = true }: AdBannerProps): React.ReactElement 
   const adUnitId = getBannerAdUnitId();
 
   if (__DEV__ || !BannerAd || !BannerAdSize) {
+    AnalyticsManager.logAdImpression('banner');
     // Mock / Expo Go placeholder
     return (
       <View style={[styles.mockBanner, { backgroundColor: colors.surfaceHighlight }]}>
@@ -45,6 +47,9 @@ export function AdBanner({ visible = true }: AdBannerProps): React.ReactElement 
       <BannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        onAdLoaded={() => {
+          AnalyticsManager.logAdImpression('banner');
+        }}
         onAdFailedToLoad={(error: any) => {
           console.warn('[AD] Banner failed to load:', error);
         }}
