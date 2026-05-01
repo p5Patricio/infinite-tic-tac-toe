@@ -1,12 +1,53 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
+import { useTheme } from '@/hooks/useTheme';
 import { getColors } from '@/constants/theme';
 import { Move } from '@/types/game';
 
+function OldestDot({
+  color,
+  children,
+}: {
+  color: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.2,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.dotContainer,
+        { borderColor: color, borderWidth: 2, transform: [{ scale: scaleAnim }] },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 export function PlayerIndicator(): React.ReactElement {
   const gameState = useGameStore((s) => s.gameState);
-  const theme = useGameStore((s) => s.theme);
+  const theme = useTheme();
   const colors = getColors(theme);
 
   const renderMoveDots = (moves: Move[], player: 'X' | 'O') => {
@@ -16,21 +57,23 @@ export function PlayerIndicator(): React.ReactElement {
         {[1, 2, 3].map((num) => {
           const move = moves[num - 1];
           const isOldest = num === 1 && moves.length === 3;
+          const dotContent = move ? (
+            <Text style={[styles.dotText, { color }]}>{num}</Text>
+          ) : (
+            <View style={[styles.emptyDot, { borderColor: color }]} />
+          );
+
+          if (isOldest) {
+            return (
+              <OldestDot key={num} color={color}>
+                {dotContent}
+              </OldestDot>
+            );
+          }
+
           return (
-            <View
-              key={num}
-              style={[
-                styles.dotContainer,
-                isOldest && { borderColor: color, borderWidth: 2 },
-              ]}
-            >
-              {move ? (
-                <Text style={[styles.dotText, { color }]}>
-                  {num}
-                </Text>
-              ) : (
-                <View style={[styles.emptyDot, { borderColor: color }]} />
-              )}
+            <View key={num} style={styles.dotContainer}>
+              {dotContent}
             </View>
           );
         })}
@@ -48,9 +91,7 @@ export function PlayerIndicator(): React.ReactElement {
           },
         ]}
       >
-        <Text style={[styles.playerLabel, { color: colors.playerX }]}>
-          X
-        </Text>
+        <Text style={[styles.playerLabel, { color: colors.playerX }]}>X</Text>
         {renderMoveDots(gameState.movesX, 'X')}
       </View>
       <View
@@ -61,9 +102,7 @@ export function PlayerIndicator(): React.ReactElement {
           },
         ]}
       >
-        <Text style={[styles.playerLabel, { color: colors.playerO }]}>
-          O
-        </Text>
+        <Text style={[styles.playerLabel, { color: colors.playerO }]}>O</Text>
         {renderMoveDots(gameState.movesO, 'O')}
       </View>
     </View>

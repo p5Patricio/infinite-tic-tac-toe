@@ -9,6 +9,7 @@ import {
 import { signInAnonymously } from '@/services/firebase/auth';
 import { createUserProfile } from '@/services/firebase/userService';
 import { isFirebaseReady } from '@/services/firebase/config';
+import { loadStats, recordGameResult, resetStats } from '@/services/stats/StatsManager';
 
 interface GameStoreState {
   // Auth
@@ -22,10 +23,16 @@ interface GameStoreState {
   // Settings
   soundEnabled: boolean;
   hapticEnabled: boolean;
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
   adsRemoved: boolean;
   interstitialCounter: number;
   aiDifficulty: AIDifficulty;
+
+  // Stats
+  gamesPlayed: number;
+  gamesWon: number;
+  currentStreak: number;
+  bestStreak: number;
 
   // Actions
   initAuth: () => Promise<void>;
@@ -35,10 +42,17 @@ interface GameStoreState {
   toggleSound: () => void;
   toggleHaptic: () => void;
   toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setAdsRemoved: (removed: boolean) => void;
   incrementInterstitialCounter: () => void;
   resetInterstitialCounter: () => void;
   setAIDifficulty: (difficulty: AIDifficulty) => void;
+
+  // Stats actions
+  loadStatsAsync: () => Promise<void>;
+  recordWin: () => Promise<void>;
+  recordLoss: () => Promise<void>;
+  resetStatsAsync: () => Promise<void>;
 }
 
 export const useGameStore = create<GameStoreState>()(
@@ -50,10 +64,14 @@ export const useGameStore = create<GameStoreState>()(
       gameState: createInitialState(),
       soundEnabled: true,
       hapticEnabled: true,
-      theme: 'dark',
+      theme: 'system',
       adsRemoved: false,
       interstitialCounter: 0,
       aiDifficulty: 'medium',
+      gamesPlayed: 0,
+      gamesWon: 0,
+      currentStreak: 0,
+      bestStreak: 0,
 
       initAuth: async () => {
         try {
@@ -96,9 +114,14 @@ export const useGameStore = create<GameStoreState>()(
         set((state) => ({ hapticEnabled: !state.hapticEnabled })),
 
       toggleTheme: () =>
-        set((state) => ({
-          theme: state.theme === 'dark' ? 'light' : 'dark',
-        })),
+        set((state) => {
+          const cycle: Array<'dark' | 'light' | 'system'> = ['dark', 'light', 'system'];
+          const idx = cycle.indexOf(state.theme);
+          const next = cycle[(idx + 1) % cycle.length];
+          return { theme: next };
+        }),
+
+      setTheme: (theme) => set({ theme }),
 
       setAdsRemoved: (removed: boolean) =>
         set({ adsRemoved: removed }),
@@ -110,8 +133,45 @@ export const useGameStore = create<GameStoreState>()(
 
       resetInterstitialCounter: () =>
         set({ interstitialCounter: 0 }),
+
       setAIDifficulty: (difficulty: AIDifficulty) =>
         set({ aiDifficulty: difficulty }),
+
+      loadStatsAsync: async () => {
+        try {
+          const stats = await loadStats();
+          set(stats);
+        } catch {
+          // Ignorar errores de carga de stats
+        }
+      },
+
+      recordWin: async () => {
+        try {
+          const stats = await recordGameResult(true);
+          set(stats);
+        } catch {
+          // Ignorar
+        }
+      },
+
+      recordLoss: async () => {
+        try {
+          const stats = await recordGameResult(false);
+          set(stats);
+        } catch {
+          // Ignorar
+        }
+      },
+
+      resetStatsAsync: async () => {
+        try {
+          await resetStats();
+          set({ gamesPlayed: 0, gamesWon: 0, currentStreak: 0, bestStreak: 0 });
+        } catch {
+          // Ignorar
+        }
+      },
     }),
     {
       name: 'infinite-ttt-settings',
@@ -123,6 +183,10 @@ export const useGameStore = create<GameStoreState>()(
         adsRemoved: state.adsRemoved,
         interstitialCounter: state.interstitialCounter,
         aiDifficulty: state.aiDifficulty,
+        gamesPlayed: state.gamesPlayed,
+        gamesWon: state.gamesWon,
+        currentStreak: state.currentStreak,
+        bestStreak: state.bestStreak,
       }),
     }
   )

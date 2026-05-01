@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useGameStore } from '@/store/gameStore';
 import { getColors } from '@/constants/theme';
+import { useTheme } from '@/hooks/useTheme';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { AIDifficulty } from '@/types/game';
 
@@ -23,12 +24,22 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<
 
 export function HomeScreen(): React.ReactElement {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const theme = useGameStore((s) => s.theme);
+  const storeTheme = useGameStore((s) => s.theme);
   const toggleTheme = useGameStore((s) => s.toggleTheme);
+  const theme = useTheme();
   const setAIDifficulty = useGameStore((s) => s.setAIDifficulty);
-  const colors = getColors(theme);
+  const loadStatsAsync = useGameStore((s) => s.loadStatsAsync);
+  const gamesPlayed = useGameStore((s) => s.gamesPlayed);
+  const gamesWon = useGameStore((s) => s.gamesWon);
+  const currentStreak = useGameStore((s) => s.currentStreak);
+  const bestStreak = useGameStore((s) => s.bestStreak);
+  const colors = getColors(storeTheme);
 
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
+
+  useEffect(() => {
+    loadStatsAsync().catch(() => {});
+  }, [loadStatsAsync]);
 
   const handleSelectDifficulty = (difficulty: AIDifficulty) => {
     setAIDifficulty(difficulty);
@@ -67,11 +78,16 @@ export function HomeScreen(): React.ReactElement {
     { label: 'Difícil', value: 'hard', color: '#FF3B30' },
   ];
 
+  const stats = [
+    { label: 'Jugadas', value: gamesPlayed },
+    { label: 'Ganadas', value: gamesWon },
+    { label: 'Racha', value: currentStreak },
+    { label: 'Mejor', value: bestStreak },
+  ];
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
 
       {/* Settings / Theme toggle */}
       <View style={styles.topBar}>
@@ -93,9 +109,7 @@ export function HomeScreen(): React.ReactElement {
 
       {/* Title */}
       <View style={styles.titleContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Infinite
-        </Text>
+        <Text style={[styles.title, { color: colors.text }]}>Infinite</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Tic Tac Toe
         </Text>
@@ -130,6 +144,23 @@ export function HomeScreen(): React.ReactElement {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      {/* Stats summary */}
+      <View style={[styles.statsContainer, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.statsTitle, { color: colors.text }]}>Estadísticas</Text>
+        <View style={styles.statsRow}>
+          {stats.map((stat) => (
+            <View key={stat.label} style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                {stat.label}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* Footer */}
@@ -231,6 +262,36 @@ const styles = StyleSheet.create({
   modeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  statsContainer: {
+    marginHorizontal: 24,
+    marginTop: 24,
+    borderRadius: 16,
+    padding: 16,
+  },
+  statsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
   },
   footer: {
     marginTop: 'auto',

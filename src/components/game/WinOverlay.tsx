@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useGameStore } from '@/store/gameStore';
+import { useTheme } from '@/hooks/useTheme';
 import { getColors } from '@/constants/theme';
 
 interface WinOverlayProps {
@@ -19,7 +20,7 @@ export function WinOverlay({
   onMenu,
 }: WinOverlayProps): React.ReactElement | null {
   const gameState = useGameStore((s) => s.gameState);
-  const theme = useGameStore((s) => s.theme);
+  const theme = useTheme();
   const colors = getColors(theme);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;

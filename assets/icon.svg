@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F0F23"/>
+      <stop offset="100%" stop-color="#1C1C3E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)" rx="224"/>
+  
+  <!-- X -->
+  <g transform="translate(280, 350) rotate(-12)">
+    <line x1="0" y1="0" x2="180" y2="180" stroke="#FF6B6B" stroke-width="48" stroke-linecap="round"/>
+    <line x1="180" y1="0" x2="0" y2="180" stroke="#FF6B6B" stroke-width="48" stroke-linecap="round"/>
+  </g>
+  
+  <!-- O -->
+  <g transform="translate(580, 350)">
+    <circle cx="90" cy="90" r="80" stroke="#4ECDC4" stroke-width="48" fill="none" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Subtle grid lines -->
+  <line x1="120" y1="680" x2="904" y2="680" stroke="#3A3A4E" stroke-width="8" stroke-linecap="round"/>
+  <line x1="120" y1="720" x2="904" y2="720" stroke="#3A3A4E" stroke-width="8" stroke-linecap="round"/>
+  <line x1="120" y1="760" x2="904" y2="760" stroke="#3A3A4E" stroke-width="8" stroke-linecap="round"/>
+</svg>

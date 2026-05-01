@@ -1,4 +1,6 @@
-export type ThemeMode = 'light' | 'dark';
+import { Appearance } from 'react-native';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ThemeColors {
   background: string;
@@ -58,5 +60,8 @@ export const darkTheme: ThemeColors = {
 };
 
 export function getColors(mode: ThemeMode): ThemeColors {
+  if (mode === 'system') {
+    return Appearance.getColorScheme() === 'light' ? lightTheme : darkTheme;
+  }
   return mode === 'dark' ? darkTheme : lightTheme;
 }

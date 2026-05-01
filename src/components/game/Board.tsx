@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import { Cell } from './Cell';
 import { useGameStore } from '@/store/gameStore';
+import { useTheme } from '@/hooks/useTheme';
 import { getColors } from '@/constants/theme';
 
 interface BoardProps {
@@ -11,8 +12,10 @@ interface BoardProps {
 export function Board({ onCellPress }: BoardProps): React.ReactElement {
   const gameState = useGameStore((s) => s.gameState);
   const makeMove = useGameStore((s) => s.makeMove);
-  const theme = useGameStore((s) => s.theme);
+  const theme = useTheme();
   const colors = getColors(theme);
+
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const ghostPosition = useMemo(() => {
     if (gameState.isGameOver) return null;
@@ -31,6 +34,23 @@ export function Board({ onCellPress }: BoardProps): React.ReactElement {
     return new Set(gameState.winningLine);
   }, [gameState.winningLine]);
 
+  // Shake board on win
+  useEffect(() => {
+    if (gameState.isGameOver && gameState.winner && gameState.winner !== 'draw') {
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    } else {
+      shakeAnim.setValue(0);
+    }
+  }, [gameState.isGameOver, gameState.winner]);
+
   const handlePress = (index: number) => {
     if (onCellPress) {
       onCellPress(index);
@@ -40,7 +60,12 @@ export function Board({ onCellPress }: BoardProps): React.ReactElement {
   };
 
   return (
-    <View style={[styles.board, { backgroundColor: colors.surface }]}
+    <Animated.View
+      style={[
+        styles.board,
+        { backgroundColor: colors.surface },
+        { transform: [{ translateX: shakeAnim }] },
+      ]}
     >
       <View style={styles.grid}>
         {gameState.board.map((value, index) => (
@@ -51,10 +76,11 @@ export function Board({ onCellPress }: BoardProps): React.ReactElement {
             isWinningCell={winningSet.has(index)}
             isGhost={ghostPosition === index && value === null}
             disabled={gameState.isGameOver}
+            isGameOver={gameState.isGameOver}
           />
         ))}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -21,12 +21,15 @@ import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { updateGameState } from '@/services/firebase/roomService';
 import { getAIMove } from '@/services/game/AIEngine';
 import { AdBanner } from '@/components/game/AdBanner';
+import { useTheme } from '@/hooks/useTheme';
 import {
   incrementGameCounter,
   shouldShowInterstitial,
   showInterstitial,
   resetGameCounter,
 } from '@/services/ads/AdManager';
+import { AudioManager } from '@/services/audio/AudioManager';
+import { HapticsManager } from '@/services/haptics/HapticsManager';
 
 type GameScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -42,9 +45,12 @@ export function GameScreen(): React.ReactElement {
   const gameState = useGameStore((s) => s.gameState);
   const makeMoveLocal = useGameStore((s) => s.makeMove);
   const resetGame = useGameStore((s) => s.resetGame);
-  const theme = useGameStore((s) => s.theme);
+  const recordWin = useGameStore((s) => s.recordWin);
+  const recordLoss = useGameStore((s) => s.recordLoss);
+  const storeTheme = useGameStore((s) => s.theme);
   const aiDifficulty = useGameStore((s) => s.aiDifficulty);
-  const colors = getColors(theme);
+  const theme = useTheme();
+  const colors = getColors(storeTheme);
 
   const isOnline = mode === 'online';
   const isAI = mode === 'ai';
@@ -57,6 +63,11 @@ export function GameScreen(): React.ReactElement {
     isOnline ? roomId : undefined,
     isOnline ? myPlayer : undefined
   );
+
+  // Refs for detecting board changes and game end
+  const prevBoardRef = useRef(gameState.board);
+  const gameEndedRef = useRef(false);
+  const isFirstBoardChange = useRef(true);
 
   useEffect(() => {
     resetGame(mode);
@@ -77,6 +88,67 @@ export function GameScreen(): React.ReactElement {
     anim.start();
     return () => anim.stop();
   }, [aiThinking]);
+
+  // Detectar colocación y desaparición de fichas
+  useEffect(() => {
+    if (isFirstBoardChange.current) {
+      isFirstBoardChange.current = false;
+      prevBoardRef.current = gameState.board;
+      return;
+    }
+
+    const prev = prevBoardRef.current;
+    prevBoardRef.current = gameState.board;
+
+    let placed = false;
+    let disappeared = false;
+
+    for (let i = 0; i < gameState.board.length; i++) {
+      if (prev[i] === null && gameState.board[i] !== null) {
+        placed = true;
+      }
+      if (prev[i] !== null && gameState.board[i] === null) {
+        disappeared = true;
+      }
+    }
+
+    if (placed) {
+      AudioManager.playPlace().catch(() => {});
+      HapticsManager.hapticPlace().catch(() => {});
+    }
+    if (disappeared) {
+      AudioManager.playDisappear().catch(() => {});
+      HapticsManager.hapticDisappear().catch(() => {});
+    }
+  }, [gameState.board]);
+
+  // Detectar fin de partida y reproducir sonidos de victoria + stats
+  useEffect(() => {
+    if (gameState.isGameOver && !gameEndedRef.current) {
+      gameEndedRef.current = true;
+
+      if (gameState.winner && gameState.winner !== 'draw') {
+        AudioManager.playWin().catch(() => {});
+        HapticsManager.hapticWin().catch(() => {});
+
+        if (mode !== 'online' && mode !== 'zen') {
+          if (gameState.winner === myPlayer) {
+            recordWin().catch(() => {});
+          } else {
+            recordLoss().catch(() => {});
+          }
+        }
+      } else if (gameState.winner === 'draw') {
+        if (mode !== 'online' && mode !== 'zen') {
+          recordLoss().catch(() => {});
+        }
+      }
+    }
+
+    if (!gameState.isGameOver) {
+      gameEndedRef.current = false;
+    }
+  }, [gameState.isGameOver, gameState.winner, mode, myPlayer, recordWin, recordLoss]);
 
   // Turno de la IA
   useEffect(() => {
@@ -160,31 +232,22 @@ export function GameScreen(): React.ReactElement {
     : null;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={[styles.backText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {modeLabel}
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{modeLabel}</Text>
           {statusText && (
             <Text
               style={[
                 styles.statusText,
                 {
-                  color: opponentDisconnected
-                    ? colors.playerX
-                    : colors.textSecondary,
+                  color: opponentDisconnected ? colors.playerX : colors.textSecondary,
                 },
               ]}
             >
@@ -204,9 +267,7 @@ export function GameScreen(): React.ReactElement {
               styles.turnPlayer,
               {
                 color:
-                  gameState.currentPlayer === 'X'
-                    ? colors.playerX
-                    : colors.playerO,
+                  gameState.currentPlayer === 'X' ? colors.playerX : colors.playerO,
               },
             ]}
           >
@@ -224,10 +285,7 @@ export function GameScreen(): React.ReactElement {
       {isAI && aiThinking && (
         <View style={styles.thinkingContainer}>
           <Animated.Text
-            style={[
-              styles.thinkingText,
-              { color: colors.textSecondary, opacity: dotAnim },
-            ]}
+            style={[styles.thinkingText, { color: colors.textSecondary, opacity: dotAnim }]}
           >
             🤖 IA está pensando...
           </Animated.Text>
@@ -327,8 +385,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
-  },
-  bannerPlaceholder: {
-    height: 60,
   },
 });
